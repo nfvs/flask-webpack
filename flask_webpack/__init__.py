@@ -60,11 +60,16 @@ class Webpack(object):
             self.assets_url = app.config.get('WEBPACK_ASSETS_URL')
             with app.open_resource(webpack_stats, 'r') as stats_json:
                 stats = json.load(stats_json)
+                public_path = '/'
 
-                if not self.assets_url:
-                    self.assets_url = stats['publicPath']
+                if app.config.get('WEBPACK_MANIFEST_ASSETS_ONLY') is True:
+                    self.assets = stats
+                else:
+                    self.assets = stats['assets']
+                    public_path = stats.get('publicPath') or public_path
 
-                self.assets = stats['assets']
+                self.assets_url = (app.config.get('WEBPACK_ASSETS_URL')
+                                   or public_path)
         except IOError:
             if app.config.get('WEBPACK_ASSETS_FALLBACK') is not True:
                 raise RuntimeError(
