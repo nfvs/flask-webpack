@@ -18,6 +18,7 @@ class Webpack(object):
         :param app: Flask application
         :return: None
         """
+        self.app = app
 
         # Setup a few sane defaults.
         app.config.setdefault('WEBPACK_MANIFEST_PATH',
@@ -55,19 +56,20 @@ class Webpack(object):
         webpack_stats = app.config['WEBPACK_MANIFEST_PATH']
 
         try:
+            self.assets = {}
+            self.assets_url = app.config.get('WEBPACK_ASSETS_URL')
             with app.open_resource(webpack_stats, 'r') as stats_json:
                 stats = json.load(stats_json)
 
-                if app.config['WEBPACK_ASSETS_URL']:
-                    self.assets_url = app.config['WEBPACK_ASSETS_URL']
-                else:
+                if not self.assets_url:
                     self.assets_url = stats['publicPath']
 
                 self.assets = stats['assets']
         except IOError:
-            raise RuntimeError(
-                "Flask-Webpack requires 'WEBPACK_MANIFEST_PATH' to be set and "
-                "it must point to a valid json file.")
+            if app.config.get('WEBPACK_ASSETS_FALLBACK') is not True:
+                raise RuntimeError(
+                    "Flask-Webpack requires 'WEBPACK_MANIFEST_PATH' to be set and "
+                    "it must point to a valid json file.")
 
     def _refresh_webpack_stats(self):
         """
@@ -123,7 +125,11 @@ class Webpack(object):
         if '//' in asset:
             return asset
 
-        if asset not in self.assets:
-            return None
+        target_asset = self.assets.get(asset)
+        if not target_asset:
+            if self.app.config.get('WEBPACK_ASSETS_FALLBACK') is True:
+                target_asset = asset
+            else:
+                return None
 
-        return '{0}{1}'.format(self.assets_url, self.assets[asset])
+        return '{0}{1}'.format(self.assets_url, target_asset)
